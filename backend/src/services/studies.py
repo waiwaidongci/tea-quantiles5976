@@ -26,15 +26,15 @@ def observations(db,id):
 
 def save_observation(db,id,data,user,row_id=None):
     require(db,id)
-    try: values=validate_values(data.values)
+    try: values,quality=validate_values(data.values)
     except (ValueError,TypeError) as e: raise HTTPException(422,str(e))
     other=db.scalar(select(Observation).where(Observation.study_id==id,Observation.source_key==data.source_key))
     if other and other.id!=row_id: raise HTTPException(409,'源记录编号重复')
     if row_id:
         row=db.get(Observation,row_id)
         if not row or row.study_id!=id: raise HTTPException(404,'记录不存在')
-        row.source_key=data.source_key;row.values=values
+        row.source_key=data.source_key;row.values=values;row.quality=quality
     else:
         if len(observations(db,id))>=5000: raise HTTPException(422,'小型研究最多5000行')
-        row=Observation(study_id=id,source_key=data.source_key,values=values);db.add(row)
-    log(db,user,'observation.save',f'{id}/{data.source_key}');db.commit();return record(row)
+        row=Observation(study_id=id,source_key=data.source_key,values=values,quality=quality);db.add(row)
+    log(db,user,'observation.save',f'{id}/{data.source_key}/quality='+','.join(f'{k}:{v["state"]}' for k,v in quality.items()));db.commit();return record(row)

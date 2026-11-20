@@ -36,7 +36,12 @@ def seed():
             for n,values in enumerate(rows):
                 key=f'DEMO-{k+1}-{n+1:04}'
                 if not db.scalar(select(Observation.id).where(Observation.study_id==study.id,Observation.source_key==key)):
-                    db.add(Observation(study_id=study.id,source_key=key,values=values))
+                    quality={fk:{'state':'included','reason':''} for fk,_label,kind in DOMAIN['fields'] if kind!='text'}
+                    db.add(Observation(study_id=study.id,source_key=key,values=values,quality=quality))
+            # 历史行回填：无 quality 记录的旧数据按全部纳入处理
+            for old in db.scalars(select(Observation).where(Observation.study_id==study.id)):
+                if not getattr(old,'quality',None):
+                    old.quality={fk:{'state':'included','reason':''} for fk,_label,kind in DOMAIN['fields'] if kind!='text'}
         db.commit()
         counts={model.__tablename__:db.scalar(select(func.count()).select_from(model)) for model in (User,Study,Observation)}
         print(json.dumps(counts));return counts
